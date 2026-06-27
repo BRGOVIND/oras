@@ -315,6 +315,70 @@ var _ = Describe("1.1 registry users:", func() {
 			}))
 		})
 
+		It("should attach a file with a layer annotation scoped to that file via --annotation flag", func() {
+			// prepare
+			testRepo := attachTestRepo("layer-annotation-flag")
+			tempDir := PrepareTempFiles()
+			subjectRef := RegistryRef(ZOTHost, testRepo, foobar.Tag)
+			CopyZOTRepo(ImageRepo, testRepo)
+			key := "layer-anno-key"
+			value := "layer-anno-value"
+			// test
+			ref := ORAS("attach", "--artifact-type", "test/attach", subjectRef,
+				fmt.Sprintf("%s:%s", foobar.AttachFileName, foobar.AttachFileMedia),
+				"--annotation", fmt.Sprintf("%s:%s=%s", foobar.AttachFileName, key, value),
+				"--format", "go-template={{.reference}}").
+				WithWorkDir(tempDir).Exec().Out.Contents()
+			// validate
+			fetched := ORAS("manifest", "fetch", string(ref)).Exec().Out.Contents()
+			var manifest ocispec.Manifest
+			Expect(json.Unmarshal(fetched, &manifest)).ShouldNot(HaveOccurred())
+			Expect(manifest.Layers).To(HaveLen(1))
+			Expect(manifest.Layers[0].Annotations[key]).To(Equal(value))
+		})
+
+		It("should attach with a config annotation via --annotation flag", func() {
+			// prepare
+			testRepo := attachTestRepo("config-annotation-flag")
+			tempDir := PrepareTempFiles()
+			subjectRef := RegistryRef(ZOTHost, testRepo, foobar.Tag)
+			CopyZOTRepo(ImageRepo, testRepo)
+			key := "config-anno-key"
+			value := "config-anno-value"
+			// test
+			ref := ORAS("attach", "--artifact-type", "test/attach", subjectRef,
+				fmt.Sprintf("%s:%s", foobar.AttachFileName, foobar.AttachFileMedia),
+				"--annotation", fmt.Sprintf("$config:%s=%s", key, value),
+				"--format", "go-template={{.reference}}").
+				WithWorkDir(tempDir).Exec().Out.Contents()
+			// validate
+			fetched := ORAS("manifest", "fetch", string(ref)).Exec().Out.Contents()
+			var manifest ocispec.Manifest
+			Expect(json.Unmarshal(fetched, &manifest)).ShouldNot(HaveOccurred())
+			Expect(manifest.Config.Annotations[key]).To(Equal(value))
+		})
+
+		It("should attach with an explicit manifest annotation via $manifest target", func() {
+			// prepare
+			testRepo := attachTestRepo("manifest-annotation-explicit-target")
+			tempDir := PrepareTempFiles()
+			subjectRef := RegistryRef(ZOTHost, testRepo, foobar.Tag)
+			CopyZOTRepo(ImageRepo, testRepo)
+			key := "manifest-anno-key"
+			value := "manifest-anno-value"
+			// test
+			ref := ORAS("attach", "--artifact-type", "test/attach", subjectRef,
+				fmt.Sprintf("%s:%s", foobar.AttachFileName, foobar.AttachFileMedia),
+				"--annotation", fmt.Sprintf("$manifest:%s=%s", key, value),
+				"--format", "go-template={{.reference}}").
+				WithWorkDir(tempDir).Exec().Out.Contents()
+			// validate
+			fetched := ORAS("manifest", "fetch", string(ref)).Exec().Out.Contents()
+			var manifest ocispec.Manifest
+			Expect(json.Unmarshal(fetched, &manifest)).ShouldNot(HaveOccurred())
+			Expect(manifest.Annotations[key]).To(Equal(value))
+		})
+
 		It("should fail to use --config and --platform at the same time", func() {
 			ref := RegistryRef(ZOTHost, ImageRepo, foobar.Tag)
 			tempDir := PrepareTempFiles()

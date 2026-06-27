@@ -362,6 +362,58 @@ var _ = Describe("Remote registry users:", func() {
 			Expect(manifest.Annotations[key]).To(Equal(value))
 		})
 
+		It("should push files with a layer annotation scoped to a file via --annotation flag", func() {
+			repo := pushTestRepo("layer-annotation-flag")
+			key := "layer-anno-key"
+			value := "layer-anno-value"
+			tempDir := PrepareTempFiles()
+			// test
+			ORAS("push", RegistryRef(ZOTHost, repo, tag), foobar.FileBarName,
+				"--annotation", fmt.Sprintf("%s:%s=%s", foobar.FileBarName, key, value)).
+				MatchStatus(statusKeys, true, len(statusKeys)).
+				WithWorkDir(tempDir).Exec()
+			// validate
+			fetched := ORAS("manifest", "fetch", RegistryRef(ZOTHost, repo, tag)).Exec().Out.Contents()
+			var manifest ocispec.Manifest
+			Expect(json.Unmarshal(fetched, &manifest)).ShouldNot(HaveOccurred())
+			Expect(manifest.Layers).To(HaveLen(1))
+			Expect(manifest.Layers[0].Annotations[key]).To(Equal(value))
+		})
+
+		It("should push with a config annotation via --annotation flag", func() {
+			repo := pushTestRepo("config-annotation-flag")
+			key := "config-anno-key"
+			value := "config-anno-value"
+			tempDir := PrepareTempFiles()
+			// test
+			ORAS("push", RegistryRef(ZOTHost, repo, tag), foobar.FileBarName,
+				"--annotation", fmt.Sprintf("$config:%s=%s", key, value)).
+				MatchStatus(statusKeys, true, len(statusKeys)).
+				WithWorkDir(tempDir).Exec()
+			// validate
+			fetched := ORAS("manifest", "fetch", RegistryRef(ZOTHost, repo, tag)).Exec().Out.Contents()
+			var manifest ocispec.Manifest
+			Expect(json.Unmarshal(fetched, &manifest)).ShouldNot(HaveOccurred())
+			Expect(manifest.Config.Annotations[key]).To(Equal(value))
+		})
+
+		It("should push with an explicit manifest annotation via $manifest target", func() {
+			repo := pushTestRepo("manifest-annotation-explicit-target")
+			key := "manifest-anno-key"
+			value := "manifest-anno-value"
+			tempDir := PrepareTempFiles()
+			// test
+			ORAS("push", RegistryRef(ZOTHost, repo, tag), foobar.FileBarName,
+				"--annotation", fmt.Sprintf("$manifest:%s=%s", key, value)).
+				MatchStatus(statusKeys, true, len(statusKeys)).
+				WithWorkDir(tempDir).Exec()
+			// validate
+			fetched := ORAS("manifest", "fetch", RegistryRef(ZOTHost, repo, tag)).Exec().Out.Contents()
+			var manifest ocispec.Manifest
+			Expect(json.Unmarshal(fetched, &manifest)).ShouldNot(HaveOccurred())
+			Expect(manifest.Annotations[key]).To(Equal(value))
+		})
+
 		It("should push files with customized file annotation", func() {
 			repo := pushTestRepo("file-annotation")
 			tempDir := PrepareTempFiles()

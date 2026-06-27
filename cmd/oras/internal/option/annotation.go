@@ -45,8 +45,18 @@ func (opts *Annotation) ApplyFlags(fs *pflag.FlagSet) {
 }
 
 // Parse parses the input annotation flags.
+//
+// Accepted formats:
+//   - "key=value"           → manifest-level annotation (default target: $manifest)
+//   - "target:key=value"    → annotation scoped to an explicit target:
+//     "$manifest"  for the manifest, "$config" for the image config,
+//     or a filename (e.g. "hi.txt") for the corresponding layer.
+//
+// Note: this is a breaking change for annotation keys that previously
+// contained a colon. The first colon in the key segment (before "=") is
+// now treated as a target separator.
 func (opts *Annotation) Parse(*cobra.Command) error {
-	manifestAnnotations := make(map[string]string)
+	annotations := make(map[string]map[string]string)
 	for _, anno := range opts.ManifestAnnotations {
 		key, val, success := strings.Cut(anno, "=")
 		if !success {
@@ -55,13 +65,19 @@ func (opts *Annotation) Parse(*cobra.Command) error {
 				Recommendation: `Please use the correct format in the flag: --annotation "key=value"`,
 			}
 		}
-		if _, ok := manifestAnnotations[key]; ok {
-			return fmt.Errorf("%w: %v, ", errAnnotationDuplication, key)
+		target := AnnotationManifest
+		if t, k, hasTarget := strings.Cut(key, ":"); hasTarget {
+			target = t
+			key = k
 		}
-		manifestAnnotations[key] = val
+		if annotations[target] == nil {
+			annotations[target] = make(map[string]string)
+		}
+		if _, ok := annotations[target][key]; ok {
+			return fmt.Errorf("%w: %v", errAnnotationDuplication, key)
+		}
+		annotations[target][key] = val
 	}
-	opts.Annotations = map[string]map[string]string{
-		AnnotationManifest: manifestAnnotations,
-	}
+	opts.Annotations = annotations
 	return nil
 }
